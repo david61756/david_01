@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>월별 가계부</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #1e1e1e; color: #d4d4d4; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #3e3e3e; padding: 8px; text-align: left; }
+        th { background-color: #2d2d2d; }
+        .total { font-weight: bold; background-color: #3c3c3c; }
+        .category-group { background-color: #333333; }
+        .chart-container { margin-top: 30px; }
+        .input-section { margin-bottom: 20px; padding: 15px; border: 1px solid #3e3e3e; border-radius: 5px; background-color: #252526; }
+        button { padding: 8px 15px; cursor: pointer; background-color: #0e639c; color: white; border: none; border-radius: 3px; }
+        button:hover { background-color: #1177bb; }
+        .status { margin-top: 10px; padding: 10px; border-radius: 5px; display: none; }
+        .status.success { background-color: #143d23; color: #b5e6c5; display: block; }
+        .status.error { background-color: #4e2427; color: #f8c5c8; display: block; }
+        .import-export { margin-top: 20px; padding-top: 15px; border-top: 1px solid #3e3e3e; }
+        #file-input { display: none; }
+        .action-btn { 
+            padding: 3px 8px; 
+            margin-right: 5px; 
+            border-radius: 3px; 
+            cursor: pointer; 
+        }
+        .edit-btn { 
+            background-color: #264f78; 
+            border: none; 
+            color: white; 
+        }
+        .delete-btn { 
+            background-color: #4e2427; 
+            border: none; 
+            color: white; 
+        }
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); }
+        .modal-content { background-color: #252526; margin: 15% auto; padding: 20px; border: 1px solid #3e3e3e; width: 80%; max-width: 500px; border-radius: 5px; color: #d4d4d4; }
+        .close { color: #999; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover, .close:focus { color: #fff; text-decoration: none; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; background-color: #3c3c3c; color: #d4d4d4; border: 1px solid #3e3e3e; }
+        input, select { padding: 5px; margin-right: 10px; background-color: #3c3c3c; color: #d4d4d4; border: 1px solid #3e3e3e; }
+    </style>
+</head>
+<body>
+    <h1>월별 가계부</h1>
+    
+    <div class="input-section">
+        <h2>지출 입력</h2>
+        <button onclick="addExpense()" style="margin-right: 10px;">추가</button>
+        <label for="date">날짜:</label>
+        <input type="date" id="date">
+        
+        <label for="category" style="margin-left: 20px;">분류:</label>
+        <select id="category">
+            <option value="주거">주거</option>
+            <option value="생활">생활</option>
+            <option value="식사">식사</option>
+            <option value="교통">교통</option>
+            <option value="의료/보험">의료/보험</option>
+            <option value="교육">교육</option>
+            <option value="통신">통신</option>
+            <option value="문화">문화</option>
+            <option value="의류">의류</option>
+            <option value="헌금/기부">헌금/기부</option>
+            <option value="저축">저축</option>
+            <option value="경조사">경조사</option>
+            <option value="기타">기타</option>
+        </select>
+        
+        <label for="description" style="margin-left: 20px;">내용:</label>
+        <input type="text" id="description">
+        
+        <label for="amount" style="margin-left: 20px;">금액:</label>
+        <input type="number" id="amount">
+        
+        <div id="status" class="status"></div>
+    </div>
+
+    <h2>
+        지출 내역
+        <button id="toggle-expenses" onclick="toggleExpenseList()" style="margin-left: 15px; font-size: 0.8em;">접기</button>
+        <span style="margin-left: 15px; font-size: 0.8em;">(최신순 정렬)</span>
+    </h2>
+    <label for="year-select">년도:</label>
+    <select id="year-select" onchange="updateMonthOptions(); filterByMonth();">
+        <!-- 년도 옵션은 JavaScript로 동적 생성됩니다 -->
+    </select>
+    
+    <label for="month-select" style="margin-left: 15px;">월:</label>
+    <select id="month-select" onchange="filterByMonth()">
+        <option value="1">1월</option>
+        <option value="2">2월</option>
+        <option value="3">3월</option>
+        <option value="4">4월</option>
+        <option value="5">5월</option>
+        <option value="6">6월</option>
+        <option value="7">7월</option>
+        <option value="8">8월</option>
+        <option value="9">9월</option>
+        <option value="10">10월</option>
+        <option value="11">11월</option>
+        <option value="12">12월</option>
+    </select>
+    
+    <table id="expense-table">
+        <thead>
+            <tr>
+                <th>날짜</th>
+                <th>분류</th>
+                <th>내용</th>
+                <th>금액</th>
+                <th>비고</th>
+                <th>관리</th>
+            </tr>
+        </thead>
+        <tbody id="expense-body">
+            <!-- 데이터가 여기에 추가됩니다 -->
+        </tbody>
+        <tfoot>
+            <tr class="total">
+                <td colspan="3">합계 (포함된 항목)</td>
+                <td id="total-amount">0</td>
+                <td colspan="2">
+                    <button id="batch-edit-btn" onclick="openBatchEditModal()" style="font-size: 0.8em;">분류 일괄 수정</button>
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+    
+    <h2>카테고리별 지출 요약</h2>
+    <table id="summary-table">
+        <thead>
+            <tr>
+                <th>분류</th>
+                <th>금액</th>
+                <th>비율</th>
+            </tr>
+        </thead>
+        <tbody id="summary-body">
+            <!-- 요약 데이터가 여기에 추가됩니다 -->
+        </tbody>
+    </table>
+    
+    <div class="chart-container">
+        <h2>월별 지출 그래프</h2>
+        <canvas id="expense-chart" width="800" height="400"></canvas>
+    </div>
+    
+    <div class="chart-container">
+        <h2>카테고리별 지출 그래프</h2>
+        <canvas id="category-chart" width="800" height="400"></canvas>
+    </div>
+    
+    <div class="input-section import-export">
+        <h2>데이터 가져오기/내보내기</h2>
+        <button onclick="exportData()">데이터 다운로드</button>
+        <button onclick="document.getElementById('file-input').click()">데이터 가져오기</button>
+        <input type="file" id="file-input" accept=".json" onchange="importData(this.files)">
+        <p><small>* 데이터를 Google 스프레드시트로 관리하려면 다운로드한 JSON 파일을 안전하게 보관하세요.</small></p>
+    </div>
+    
+    <!-- 편집 모달 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditModal()">&times;</span>
+            <h2>지출 항목 편집</h2>
+            <div class="form-group">
+                <label for="edit-date">날짜:</label>
+                <input type="date" id="edit-date">
+            </div>
+            <div class="form-group">
+                <label for="edit-category">분류:</label>
+                <select id="edit-category">
+                    <option value="주거">주거</option>
+                    <option value="생활">생활</option>
+                    <option value="식사">식사</option>
+                    <option value="교통">교통</option>
+                    <option value="의료/보험">의료/보험</option>
+                    <option value="교육">교육</option>
+                    <option value="통신">통신</option>
+                    <option value="문화">문화</option>
+                    <option value="의류">의류</option>
+                    <option value="헌금/기부">헌금/기부</option>
+                    <option value="저축">저축</option>
+                    <option value="경조사">경조사</option>
+                    <option value="기타">기타</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit-description">내용:</label>
+                <input type="text" id="edit-description">
+            </div>
+            <div class="form-group">
+                <label for="edit-amount">금액:</label>
+                <input type="number" id="edit-amount">
+            </div>
+            <div class="form-group">
+                <label for="edit-note">비고:</label>
+                <input type="text" id="edit-note">
+            </div>
+            <input type="hidden" id="edit-id">
+            <div style="margin-top: 20px;">
+                <button type="button" onclick="saveEdit()">저장</button>
+                <button type="button" onclick="closeEditModal()" style="margin-left: 10px;">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 분류 일괄 수정 모달 -->
+    <div id="batchEditModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeBatchEditModal()">&times;</span>
+            <h2>분류 일괄 수정</h2>
+            
+            <div id="current-categories" style="margin-bottom: 20px; padding: 10px; background-color: #333; border-radius: 5px;">
+                <!-- 현재 선택된 항목들의 카테고리 정보가 여기에 표시됩니다 -->
+            </div>
+            
+            <div class="form-group">
+                <label for="batch-edit-category">새 분류:</label>
+                <select id="batch-edit-category">
+                    <option value="">- 선택 -</option>
+                    <option value="주거">주거</option>
+                    <option value="생활">생활</option>
+                    <option value="식사">식사</option>
+                    <option value="교통">교통</option>
+                    <option value="의료/보험">의료/보험</option>
+                    <option value="교육">교육</option>
+                    <option value="통신">통신</option>
+                    <option value="문화">문화</option>
+                    <option value="의류">의류</option>
+                    <option value="헌금/기부">헌금/기부</option>
+                    <option value="저축">저축</option>
+                    <option value="경조사">경조사</option>
+                    <option value="기타">기타</option>
+                </select>
+            </div>
+            <input type="hidden" id="batch-edit-ids">
+            
+            <div style="margin-top: 20px;">
+                <button type="button" onclick="saveBatchEdit()">변경</button>
+                <button type="button" onclick="closeBatchEditModal()" style="margin-left: 10px;">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <script>
+        // 지출 데이터를 저장할 배열
+        let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+        let categoryChart = null;
+        let expenseChart = null;
+        let currentEditId = null;
+        
+        // 모든 체크박스 토글 함수 - 이제 필요 없음
+        function toggleAllCheckboxes() {
+            // 제거됨 - 각 항목별로만 체크박스 사용
+        }
+        
+        // 특정 항목의 포함/제외 상태 토글 함수
+        function toggleExpenseInclusion(id, include) {
+            const index = expenses.findIndex(expense => expense.id === id);
+            if (index !== -1) {
+                expenses[index].excluded = !include;
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+                updateTotal();
+            }
+        }
+        
+        // 합계 업데이트 함수
+        function updateTotal() {
+            const selectedYear = parseInt(document.getElementById('year-select').value);
+            const selectedMonth = document.getElementById('month-select').value;
+            
+            // 선택된 연도와 월에 따라 필터링
+            const filteredExpenses = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                const expenseYear = expenseDate.getFullYear();
+                const expenseMonth = expenseDate.getMonth() + 1;
+                return expenseYear === selectedYear && expenseMonth.toString() === selectedMonth;
+            });
+            
+            // 제외되지 않은 항목만 합계 계산
+            let totalAmount = 0;
+            filteredExpenses.forEach(expense => {
+                if (!expense.excluded) {
+                    totalAmount += parseInt(expense.amount) || 0;
+                }
+            });
+            
+            // 합계 업데이트
+            document.getElementById('total-amount').textContent = formatAmount(totalAmount);
+        }
+        
+        // 분류 일괄 수정 모달 열기
+        function openBatchEditModal() {
+            // 체크된 항목들 찾기 (포함으로 체크된 항목들)
+            const checkedBoxes = document.querySelectorAll('#expense-body input[type="checkbox"]:checked');
+            if (checkedBoxes.length === 0) {
+                alert('일괄 수정할 항목이 없습니다. 적어도 하나 이상의 항목이 "포함"으로 체크되어 있어야 합니다.');
+                return;
+            }
+            
+            // 현재 선택된 항목들의 카테고리 불러오기
+            const selectedIds = Array.from(checkedBoxes).map(checkbox => checkbox.dataset.id);
+            const currentCategories = {};
+            
+            selectedIds.forEach(id => {
+                const expense = expenses.find(e => e.id === id);
+                if (expense) {
+                    if (!currentCategories[expense.category]) {
+                        currentCategories[expense.category] = 0;
+                    }
+                    currentCategories[expense.category]++;
+                }
+            });
+            
+            // 현재 카테고리 정보 표시
+            const categoryInfoDiv = document.getElementById('current-categories');
+            categoryInfoDiv.innerHTML = '';
+            for (const category in currentCategories) {
+                const p = document.createElement('p');
+                p.innerHTML = `<span>${category}</span>: ${currentCategories[category]}개 항목`;
+                categoryInfoDiv.appendChild(p);
+            }
+            
+            // 선택된 항목 ID 저장
+            document.getElementById('batch-edit-ids').value = selectedIds.join(',');
+            
+            // 모달 표시
+            document.getElementById('batchEditModal').style.display = 'block';
+        }
+        
+        // 분류 일괄 수정 모달 닫기
+        function closeBatchEditModal() {
+            document.getElementById('batchEditModal').style.display = 'none';
+        }
+        
+        // 분류 일괄 수정 저장
+        function saveBatchEdit() {
+            const newCategory = document.getElementById('batch-edit-category').value;
+            const idsString = document.getElementById('batch-edit-ids').value;
+            const ids = idsString.split(',');
+            
+            if (!newCategory) {
+                alert('새 분류를 선택해주세요.');
+                return;
+            }
+            
+            // 선택된 모든 항목의 카테고리 업데이트
+            let updatedCount = 0;
+            ids.forEach(id => {
+                const index = expenses.findIndex(expense => expense.id === id);
+                if (index !== -1) {
+                    expenses[index].category = newCategory;
+                    updatedCount++;
+                }
+            });
+            
+            // 변경사항 저장
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            
+            // UI 업데이트
+            displayExpenses();
+            updateSummary();
+            updateCharts();
+            
+            // 모달 닫기
+            closeBatchEditModal();
+            
+            // 성공 메시지 표시
+            showStatus(`${updatedCount}개 항목의 분류가 '${newCategory}'로 변경되었습니다.`, 'success');
+        }
+        
+        // 접기/펼치기 토글 함수
+        function toggleExpenseList() {
+            const toggleButton = document.getElementById('toggle-expenses');
+            
+            if (toggleButton.textContent === '접기') {
+                toggleButton.textContent = '펼치기';
+            } else {
+                toggleButton.textContent = '접기';
+            }
+            
+            // 지출 내역 다시 표시
+            displayExpenses();
+        }
+        
+        // 페이지 로드 시 데이터 표시
+        window.onload = function() {
+            // 현재 날짜 설정
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date').value = today;
+            
+            // 년도 옵션 설정
+            populateYearOptions();
+            
+            // 현재 연도와 월 설정
+            const currentDate = new Date();
+            const currentYear = currentDate.getFullYear();
+            const currentMonth = (currentDate.getMonth() + 1).toString();
+            
+            document.getElementById('year-select').value = currentYear;
+            document.getElementById('month-select').value = currentMonth;
+            
+            displayExpenses();
+            updateSummary();
+            createCategoryChart();
+            createMonthlyChart();
+        };
+        
+        // 년도 옵션 설정 함수
+        function populateYearOptions() {
+            const yearSelect = document.getElementById('year-select');
+            yearSelect.innerHTML = ''; // 기존 옵션 초기화
+            
+            const currentYear = new Date().getFullYear();
+            // 현재 연도 기준으로 5년 전부터 5년 후까지 옵션 생성
+            for (let year = currentYear - 5; year <= currentYear + 5; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year + '년';
+                yearSelect.appendChild(option);
+            }
+        }
+        
+        // 월 옵션 업데이트 (필요시 사용)
+        function updateMonthOptions() {
+            // 미래에 특정 월만 선택하게 하는 등의 기능 확장을 위한 함수
+            // 현재는 모든 월이 선택 가능하므로 구현하지 않음
+        }
+        
+        // 지출 추가 함수
+        function addExpense() {
+            const date = document.getElementById('date').value;
+            const category = document.getElementById('category').value;
+            const description = document.getElementById('description').value;
+            const amount = parseInt(document.getElementById('amount').value);
+            
+            if (!date || !category || !description || isNaN(amount)) {
+                showStatus('모든 필드를 입력해주세요.', 'error');
+                return;
+            }
+            
+            const expenseData = {
+                date: date,
+                category: category,
+                description: description,
+                amount: amount,
+                note: '',
+                timestamp: new Date().toISOString(),
+                id: Date.now().toString(), // 고유 ID 생성
+                excluded: false // 기본적으로 제외하지 않음
+            };
+            
+            expenses.push(expenseData);
+            
+            // 로컬 스토리지에 저장
+            localStorage.setItem('expenses', JSON.stringify(expenses));
+            
+            // 입력 필드 초기화
+            document.getElementById('description').value = '';
+            document.getElementById('amount').value = '';
+            
+            // 테이블과 차트 업데이트
+            displayExpenses();
+            updateSummary();
+            updateCharts();
+            
+            showStatus('지출 내역이 추가되었습니다.', 'success');
+        }
+        
+        // 지출 항목 삭제 함수
+        function deleteExpense(id) {
+            if (confirm('이 항목을 삭제하시겠습니까?')) {
+                expenses = expenses.filter(expense => expense.id !== id);
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+                
+                displayExpenses();
+                updateSummary();
+                updateCharts();
+                
+                showStatus('항목이 삭제되었습니다.', 'success');
+            }
+        }
+        
+        // 지출 항목 편집 모달 열기
+        function openEditModal(id) {
+            const expense = expenses.find(expense => expense.id === id);
+            if (!expense) return;
+            
+            currentEditId = id;
+            
+            document.getElementById('edit-date').value = expense.date;
+            document.getElementById('edit-category').value = expense.category;
+            document.getElementById('edit-description').value = expense.description;
+            document.getElementById('edit-amount').value = expense.amount;
+            document.getElementById('edit-note').value = expense.note || '';
+            document.getElementById('edit-id').value = expense.id;
+            
+            document.getElementById('editModal').style.display = 'block';
+        }
+        
+        // 편집 모달 닫기
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            currentEditId = null;
+        }
+        
+        // 편집 내용 저장
+        function saveEdit() {
+            const id = document.getElementById('edit-id').value;
+            const date = document.getElementById('edit-date').value;
+            const category = document.getElementById('edit-category').value;
+            const description = document.getElementById('edit-description').value;
+            const amount = parseInt(document.getElementById('edit-amount').value);
+            const note = document.getElementById('edit-note').value;
+            
+            if (!date || !category || !description || isNaN(amount)) {
+                alert('모든 필드를 입력해주세요.');
+                return;
+            }
+            
+            // ID로 지출 항목 찾기
+            const index = expenses.findIndex(expense => expense.id === id);
+            
+            // 항목이 존재하면 업데이트
+            if (index !== -1) {
+                // 기존 객체의 속성을 유지하면서 새 값으로 업데이트
+                expenses[index] = {
+                    ...expenses[index],
+                    date: date,
+                    category: category,
+                    description: description,
+                    amount: amount,
+                    note: note
+                };
+                
+                // 로컬 스토리지에 저장
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+                
+                // UI 업데이트
+                displayExpenses();
+                updateSummary();
+                updateCharts();
+                
+                // 성공 메시지 표시
+                showStatus('항목이 수정되었습니다.', 'success');
+                
+                // 모달 닫기
+                closeEditModal();
+            } else {
+                alert('항목을 찾을 수 없습니다.');
+            }
+        }
+        
+        // 데이터 내보내기 함수
+        function exportData() {
+            const dataStr = JSON.stringify(expenses, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'budget_data_' + new Date().toISOString().slice(0, 10) + '.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            showStatus('데이터가 다운로드되었습니다.', 'success');
+        }
+        
+        // 데이터 가져오기 함수
+        function importData(files) {
+            if (files.length === 0) return;
+            
+            const file = files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    
+                    if (Array.isArray(jsonData)) {
+                        if (confirm('기존 데이터를 새로운 데이터로 대체하시겠습니까?')) {
+                            // ID가 없는 항목에 ID 추가
+                            jsonData.forEach(item => {
+                                if (!item.id) {
+                                    item.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                                }
+                            });
+                            
+                            expenses = jsonData;
+                            localStorage.setItem('expenses', JSON.stringify(expenses));
+                            
+                            displayExpenses();
+                            updateSummary();
+                            updateCharts();
+                            
+                            showStatus('데이터를 성공적으로 가져왔습니다.', 'success');
+                        }
+                    } else {
+                        showStatus('올바른 데이터 형식이 아닙니다.', 'error');
+                    }
+                } catch (error) {
+                    showStatus('파일을 파싱하는 중 오류가 발생했습니다: ' + error.message, 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // 상태 메시지 표시 함수
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = 'status ' + type;
+            
+            // 일정 시간 후 메시지 숨기기
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        // 월별 필터링 함수
+        function filterByMonth() {
+            displayExpenses();
+            updateSummary();
+            updateCharts();
+        }
+        
+        // 지출 내역 표시 함수
+        function displayExpenses() {
+            const tbody = document.getElementById('expense-body');
+            tbody.innerHTML = '';
+            
+            // 선택된 연도와 월에 따라 필터링
+            const selectedYear = parseInt(document.getElementById('year-select').value);
+            const selectedMonth = document.getElementById('month-select').value;
+            
+            const filteredExpenses = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                const expenseYear = expenseDate.getFullYear();
+                const expenseMonth = expenseDate.getMonth() + 1;
+                return expenseYear === selectedYear && expenseMonth.toString() === selectedMonth;
+            });
+            
+            // 날짜 기준 최신순 정렬 (날짜가 같으면 ID 기준 최신순)
+            filteredExpenses.sort((a, b) => {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                if (dateB.getTime() !== dateA.getTime()) {
+                    return dateB - dateA; // 날짜 내림차순 (최신순)
+                }
+                // 날짜가 같으면 ID 기준 (일반적으로 ID가 더 큰 것이 최근에 추가된 항목)
+                return b.id - a.id;
+            });
+            
+            // 접기 상태면 최대 5개만 표시
+            const isCollapsed = document.getElementById('toggle-expenses').textContent === '펼치기';
+            const displayExpenses = isCollapsed ? filteredExpenses.slice(0, 5) : filteredExpenses;
+            
+            // 합계 초기화
+            let totalAmount = 0;
+            
+            // 표시할 항목들 렌더링
+            displayExpenses.forEach(expense => {
+                const row = tbody.insertRow();
+                
+                row.insertCell(0).textContent = formatDate(expense.date);
+                row.insertCell(1).textContent = expense.category;
+                row.insertCell(2).textContent = expense.description;
+                row.insertCell(3).textContent = formatAmount(expense.amount);
+                row.insertCell(4).textContent = expense.note || '';
+                
+                const actionCell = row.insertCell(5);
+                
+                // 편집 버튼
+                const editButton = document.createElement('button');
+                editButton.textContent = '편집';
+                editButton.className = 'action-btn edit-btn';
+                editButton.onclick = function() { openEditModal(expense.id); };
+                actionCell.appendChild(editButton);
+                
+                // 삭제 버튼
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = '삭제';
+                deleteButton.className = 'action-btn delete-btn';
+                deleteButton.onclick = function() { deleteExpense(expense.id); };
+                actionCell.appendChild(deleteButton);
+            });
+            
+            // 모든 항목에 대해 합계 계산 (표시 여부와 관계없이)
+            filteredExpenses.forEach(expense => {
+                totalAmount += parseInt(expense.amount) || 0;
+            });
+            
+            // 접힌 상태에서 표시되지 않은 항목이 있는 경우 안내 메시지 표시
+            if (isCollapsed && filteredExpenses.length > 5) {
+                const row = tbody.insertRow();
+                const cell = row.insertCell(0);
+                cell.colSpan = 6;
+                cell.textContent = `... 외 ${filteredExpenses.length - 5}개 항목이 더 있습니다. '펼치기'를 클릭하여 모두 확인하세요.`;
+                cell.style.textAlign = 'center';
+                cell.style.fontStyle = 'italic';
+                cell.style.color = '#999';
+                cell.style.padding = '10px';
+            }
+            
+            // 합계 업데이트
+            document.getElementById('total-amount').textContent = formatAmount(totalAmount);
+        }
+        
+        // 카테고리별 요약 업데이트 함수
+        function updateSummary() {
+            const summaryBody = document.getElementById('summary-body');
+            summaryBody.innerHTML = '';
+            
+            // 선택된 연도와 월에 따라 필터링
+            const selectedYear = parseInt(document.getElementById('year-select').value);
+            const selectedMonth = document.getElementById('month-select').value;
+            
+            const filteredExpenses = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                const expenseYear = expenseDate.getFullYear();
+                const expenseMonth = expenseDate.getMonth() + 1;
+                return expenseYear === selectedYear && expenseMonth.toString() === selectedMonth;
+            });
+            
+            // 카테고리별 합계 계산
+            const categorySums = {};
+            let totalAmount = 0;
+            
+            filteredExpenses.forEach(expense => {
+                const amount = parseInt(expense.amount) || 0;
+                if (!categorySums[expense.category]) {
+                    categorySums[expense.category] = 0;
+                }
+                categorySums[expense.category] += amount;
+                totalAmount += amount;
+            });
+            
+            // 카테고리별 요약 표시
+            for (const category in categorySums) {
+                const row = summaryBody.insertRow();
+                const amount = categorySums[category];
+                const percentage = totalAmount > 0 ? (amount / totalAmount * 100).toFixed(1) : 0;
+                
+                row.insertCell(0).textContent = category;
+                row.insertCell(1).textContent = formatAmount(amount);
+                row.insertCell(2).textContent = percentage + '%';
+            }
+        }
+        
+        // 차트 업데이트 함수
+        function updateCharts() {
+            if (categoryChart) {
+                categoryChart.destroy();
+            }
+            if (expenseChart) {
+                expenseChart.destroy();
+            }
+            createCategoryChart();
+            createMonthlyChart();
+        }
+        
+        // 카테고리별 차트 생성 함수
+        function createCategoryChart() {
+            const ctx = document.getElementById('category-chart').getContext('2d');
+            
+            // 선택된 연도와 월에 따라 필터링
+            const selectedYear = parseInt(document.getElementById('year-select').value);
+            const selectedMonth = document.getElementById('month-select').value;
+            
+            const filteredExpenses = expenses.filter(expense => {
+                const expenseDate = new Date(expense.date);
+                const expenseYear = expenseDate.getFullYear();
+                const expenseMonth = expenseDate.getMonth() + 1;
+                return expenseYear === selectedYear && expenseMonth.toString() === selectedMonth;
+            });
+            
+            // 카테고리별 합계 계산
+            const categorySums = {};
+            filteredExpenses.forEach(expense => {
+                const amount = parseInt(expense.amount) || 0;
+                if (!categorySums[expense.category]) {
+                    categorySums[expense.category] = 0;
+                }
+                categorySums[expense.category] += amount;
+            });
+            
+            const categories = Object.keys(categorySums);
+            const amounts = categories.map(category => categorySums[category]);
+            
+            // 차트 색상
+            const colors = [
+                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                '#FF9F40', '#8AC249', '#EA5F89', '#00BFFF', '#FFA07A',
+                '#C39BD3', '#7DCEA0', '#F7DC6F'
+            ];
+            
+            categoryChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: categories,
+                    datasets: [{
+                        data: amounts,
+                        backgroundColor: colors.slice(0, categories.length)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        title: {
+                            display: true,
+                            text: '카테고리별 지출 비율'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 월별 지출 차트 생성 함수
+        function createMonthlyChart() {
+            const ctx = document.getElementById('expense-chart').getContext('2d');
+            
+            // 선택된 연도에 따른 월별 합계 계산
+            const selectedYear = parseInt(document.getElementById('year-select').value);
+            const monthlySums = Array(12).fill(0);
+            
+            expenses.forEach(expense => {
+                const expenseDate = new Date(expense.date);
+                const expenseYear = expenseDate.getFullYear();
+                const month = expenseDate.getMonth();
+                
+                // 선택된 연도의 데이터만 포함
+                if (expenseYear === selectedYear) {
+                    monthlySums[month] += parseInt(expense.amount) || 0;
+                }
+            });
+            
+            const monthLabels = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+            
+            expenseChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: monthLabels,
+                    datasets: [{
+                        label: '월별 지출',
+                        data: monthlySums,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '월별 지출 추이'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 날짜 포맷 함수
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const year = date.getFullYear();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        // 금액 포맷 함수
+        function formatAmount(amount) {
+            return amount.toLocaleString() + '원';
+        }
+    </script>
+</body>
+</html>
